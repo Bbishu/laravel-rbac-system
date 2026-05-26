@@ -1,15 +1,20 @@
 FROM php:8.2-cli
 
-# System dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
     curl \
+    zip \
     libzip-dev \
-    zip
+    sqlite3 \
+    libsqlite3-dev
 
 # Install PHP extensions
-RUN docker-php-ext-install pdo pdo_mysql zip
+RUN docker-php-ext-install \
+    pdo \
+    pdo_sqlite \
+    zip
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -17,18 +22,26 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /app
 
-# Copy project
+# Copy project files
 COPY . .
 
 # Install dependencies
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader
 
-# Laravel setup
+# Create SQLite database
+RUN touch database/database.sqlite
+
+# Copy env
 RUN cp .env.example .env || true
+
+# Generate app key
 RUN php artisan key:generate || true
+
+# Cache clear
+RUN php artisan config:clear || true
 
 # Expose port
 EXPOSE 10000
 
-# Start server
+# Start Laravel server
 CMD php artisan serve --host=0.0.0.0 --port=10000
